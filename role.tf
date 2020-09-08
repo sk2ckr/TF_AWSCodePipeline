@@ -1,7 +1,3 @@
-provider "aws" {
-  region  = "us-west-1"
-}
-
 resource "aws_iam_role" "BuildTrustRole" {
     name = "user15-BuildTrustRole"
     
@@ -319,6 +315,151 @@ resource "aws_iam_role_policy" "CodePipelineLambdaExecPolicy" {
     EOF
 }
 
+### IAM Role
+
+resource "aws_iam_role" "WebAppRole" {
+    name = "user15-WebAppRole"
+    
+    assume_role_policy = <<-EOF
+    {
+        "Version": "2012-10-17",
+        "Statement": [
+            {
+                "Sid": "",
+                "Effect": "Allow",
+                "Principal": {
+                    "Service": "ec2.amazonaws.com"
+                },
+                "Action": "sts:AssumeRole"
+            }
+        ]
+    }
+    EOF
+    path = "/"
+}
+
+resource "aws_iam_role_policy" "WebAppRolePolicy" {
+    name = "user15-BackendRole"
+    role = aws_iam_role.WebAppRole.id
+
+    policy = <<-EOF
+    {
+        "Version": "2012-10-17",
+        "Statement": [
+        {
+            "Action": [
+                "autoscaling:Describe*",
+                "autoscaling:EnterStandby",
+                "autoscaling:ExitStandby",
+                "autoscaling:UpdateAutoScalingGroup"
+            ],
+            "Resource": "*",
+            "Effect": "Allow"
+        },
+        {
+            "Action": [
+                "ec2:DescribeInstances",
+                "ec2:DescribeInstanceStatus"
+            ],
+            "Resource": "*",
+            "Effect": "Allow"
+        },
+        {
+            "Action": [
+                "s3:Get*",
+                "s3:List*"
+            ],
+            "Resource": [
+                "arn:aws:s3:::cicd-workshop-us-west-1-590526570343",
+                "arn:aws:s3:::cicd-workshop-us-west-1-590526570343/*",
+                "arn:aws:s3:::codepipeline-*"
+            ],
+            "Effect": "Allow"
+        }]
+    }
+    EOF
+}
+
+resource "aws_iam_role_policy" "AmazonEC2ReadOnlyAccessPolicy" {
+    name = "user15-AmazonEC2ReadOnlyAccessPolicy"
+    role = aws_iam_role.WebAppRole.id
+
+    policy = <<-EOF
+    {
+        "Version": "2012-10-17",
+        "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": "ec2:Describe*",
+            "Resource": "*"
+        },
+        {
+            "Effect": "Allow",
+            "Action": "elasticloadbalancing:Describe*",
+            "Resource": "*"
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "cloudwatch:ListMetrics",
+                "cloudwatch:GetMetricStatistics",
+                "cloudwatch:Describe*"
+            ],
+            "Resource": "*"
+        },
+        {
+            "Effect": "Allow",
+            "Action": "autoscaling:Describe*",
+            "Resource": "*"
+        }]
+    }
+    EOF
+}
+
+resource "aws_iam_role_policy" "AWSCodeDeployReadOnlyAccessPolicy" {
+    name = "user15-AWSCodeDeployReadOnlyAccessPolicy"
+    role = aws_iam_role.WebAppRole.id
+
+    policy = <<-EOF
+    {
+        "Version": "2012-10-17",
+        "Statement": [
+        {
+            "Action": [
+                "codedeploy:Batch*",
+                "codedeploy:Get*",
+                "codedeploy:List*"
+            ],
+            "Effect": "Allow",
+            "Resource": "*"
+        },
+        {
+            "Sid": "CodeStarNotificationsPowerUserAccess",
+            "Effect": "Allow",
+            "Action": [
+                "codestar-notifications:DescribeNotificationRule"
+            ],
+            "Resource": "*",
+            "Condition": {
+                "StringLike": {
+                    "codestar-notifications:NotificationsForResource": "arn:aws:codedeploy:*"
+                }
+            }
+        },
+        {
+            "Sid": "CodeStarNotificationsListAccess",
+            "Effect": "Allow",
+            "Action": [
+                "codestar-notifications:ListNotificationRules",
+                "codestar-notifications:ListEventTypes",
+                "codestar-notifications:ListTargets"
+            ],
+            "Resource": "*"
+        }]
+    }
+    EOF
+}
+
 resource "aws_s3_bucket" "S3Bucket" {
     bucket = "cicd-workshop-us-west-1-590526570343"
     
@@ -329,24 +470,4 @@ resource "aws_s3_bucket" "S3Bucket" {
 	tags = {
 		Name = "CICDWorkshop-S3Bucket"
 	}
-}
-
-output "BuildTrustRoleOutput" {
-    value = aws_iam_role.BuildTrustRole.id
-}
-
-output "DeployTrustRoleOutput" {
-    value = aws_iam_role.DeployTrustRole.id
-}
-
-output "PipelineTrustRoleOutput" {
-    value = aws_iam_role.PipelineTrustRole.id
-}
-
-output "CodePipelineLambdaExecRoleOutput" {
-    value = aws_iam_role.CodePipelineLambdaExecRole.id
-}
-
-output "S3BucketName" {
-    value = aws_s3_bucket.S3Bucket.id
 }
